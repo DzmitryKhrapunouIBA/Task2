@@ -5,21 +5,16 @@ using System.Collections.Generic;
 using System.Windows;
 using Microsoft.Win32;
 using System.ComponentModel;
-using System.Data.SqlClient;
-using System.Data;
 using System.Windows.Controls;
 using System.Text.RegularExpressions;
 using IBA_Task_2.ExcelSerializer;
 using IBA_Task_2.JsonSerializer;
 using IBA_Task_1.Abstract;
 using System.IO;
-using System.Data.Common;
-using System.Data.Entity;
+using IBA_Task_2.Services;
 
 namespace IBA_Task_2.Views
 {
-    delegate void UpdateProgressBarDelegate(DependencyProperty dp, object value);
-
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
@@ -36,11 +31,12 @@ namespace IBA_Task_2.Views
         public string Date { get; set; }
         public List<User> Users { get; set; }
         public List<UserViewModel> UserViewModels { get; set; }
-        public Action action { get; set; }
+        public DbService Service { get; set; }
 
         public MainWindow()
         {
             InitializeComponent();
+            Service = new DbService();
         }
 
         /// <summary>
@@ -146,7 +142,7 @@ namespace IBA_Task_2.Views
         /// <param name="e"></param>
         private void SearchUserButton_Click(object sender, RoutedEventArgs e)
         {
-            GetSpecificUsers(sender, e);
+            UserViewModels = Service.GetSpecificUsers(FirstName, LastName, SurName, Country, City, Date);
         }
 
         /// <summary>
@@ -156,7 +152,7 @@ namespace IBA_Task_2.Views
         /// <param name="e"></param>
         private void OpenAllUsersButton_Click(object sender, RoutedEventArgs e)
         {
-            GetAllUsers(sender, e);
+            UserViewModels = Service.GetAllUsers(sender, e);
         }
 
         /// <summary>
@@ -169,111 +165,6 @@ namespace IBA_Task_2.Views
             UsersGrid.ItemsSource = null;
             ClearProperties();
             UserViewModels.Clear();
-        }
-
-        /// <summary>
-        /// Retrieves users by specific parameters from the database and shows them
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void GetSpecificUsers(object sender, RoutedEventArgs e)
-        {
-            using (UserContext db = new UserContext())
-            {
-                var firstNameParameter = new SqlParameter("@FirstName", FirstName);
-                var lastNameParameter = new SqlParameter("@LastName", LastName);
-                var surNameParameter = new SqlParameter("@SurName", SurName);
-                var countryParameter = new SqlParameter("@Country", Country);
-                var cityParameter = new SqlParameter("@City",  City);
-                var dateParameter = new SqlParameter("@Date", datePicker.Text);
-
-                DataTable dt = DataTable(db, "sp_GetUsers @FirstName, @LastName, @SurName, @Country, @City, @Date", firstNameParameter, lastNameParameter,
-                    surNameParameter, countryParameter, cityParameter, dateParameter);
-
-                UsersGrid.ItemsSource = dt.DefaultView;
-                GetUsersFromDataTable(dt);
-
-                ClearProperties();
-            }
-        }
-
-        /// <summary>
-        /// Retrieves all users from the database and shows them
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void GetAllUsers(object sender, RoutedEventArgs e)
-        {
-            using (UserContext db = new UserContext())
-            {
-                DataTable dt = DataTable(db, "sp_GetAllUsers");
-
-                UsersGrid.ItemsSource = dt.DefaultView;
-                GetUsersFromDataTable(dt);
-
-                ClearProperties();
-            }
-        }
-
-        /// <summary>
-        /// Get users from DataTable
-        /// </summary>
-        /// <param name="dt">Data table</param>
-        private void GetUsersFromDataTable(DataTable dt)
-        {
-            UserViewModels = new List<UserViewModel>();
-
-            for (int i = 0; i < dt.Rows.Count; i++)
-            {
-                var id = Convert.ToInt32(dt.Rows[i]["Id"]);
-                var firstName = Convert.ToString(dt.Rows[i]["FirstName"]);
-                var lastName = Convert.ToString(dt.Rows[i]["LastName"]);
-                var surName = Convert.ToString(dt.Rows[i]["SurName"]);
-                var city = Convert.ToString(dt.Rows[i]["CityName"]);
-                var country = Convert.ToString(dt.Rows[i]["CountryName"]);
-                var date = Convert.ToDateTime(dt.Rows[i]["Date"]);
-
-                User user = new User(id, firstName, lastName, surName, country, city, date);
-                UserViewModel userViewModel = new UserViewModel(user);
-                UserViewModels.Add(userViewModel);
-            }
-        }
-
-        /// <summary>
-        /// DbContext object extension method to create a new data table
-        /// </summary>
-        /// <param name="context"></param>
-        /// <param name="sqlQuery"></param>
-        /// <param name="parameters"></param>
-        /// <returns>Data table</returns>
-        DataTable DataTable(DbContext context, string sqlQuery, params DbParameter[] parameters)
-        {
-            DataTable dataTable = new DataTable();
-            DbConnection connection = context.Database.Connection;
-            DbProviderFactory dbFactory = DbProviderFactories.GetFactory(connection);
-            using (var cmd = dbFactory.CreateCommand())
-            {
-                cmd.Connection = connection;
-                cmd.CommandType = CommandType.Text;
-                cmd.CommandText = sqlQuery;
-
-                foreach (var item in parameters)
-                {
-                    if (item.Value == null || item.Value.Equals(""))
-                    {
-                        item.Value = DBNull.Value;
-                    }
-                    cmd.Parameters.Add(item);
-                }
-
-                using (DbDataAdapter adapter = dbFactory.CreateDataAdapter())
-                {
-                    adapter.SelectCommand = cmd;
-                    adapter.Fill(dataTable);
-                }
-            }
-
-            return dataTable;
         }
 
         /// <summary>
@@ -402,6 +293,19 @@ namespace IBA_Task_2.Views
             Country = null;
             City = null;
             Date = null;
+        }
+
+        /// <summary>
+        /// Clear textboxes
+        /// </summary>
+        private void ClearTextboxes()
+        {
+            tbxFirst_Name.Text = "";
+            tbxLast_Name.Text = "";
+            tbxSur_Name.Text = "";
+            tbxCountry.Text = "";
+            tbxCity.Text = "";
+            datePicker.SelectedDate = null;
         }
 
         /// <summary>

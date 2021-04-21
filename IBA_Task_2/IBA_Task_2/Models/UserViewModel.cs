@@ -19,8 +19,8 @@ namespace IBA_Task_2.Views
             FirstName = user.FirstName;
             LastName = user.LastName;
             SurName = user.SurName;
-            Country = user.Country.CountryName;
-            City = user.City.CityName;
+            Country = user.Country?.CountryName;
+            City = user.City?.CityName;
             Date = user.Date;
         }
     }
